@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { DesignConceptShowcase } from './components/DesignConceptShowcase';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { SectionCardDeck } from './components/SectionCardDeck';
 import { SectionComplete } from './components/SectionComplete';

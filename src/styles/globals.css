@@ -1,91 +1,85 @@
 @custom-variant dark (&:is(.dark *));
 
-@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&family=Quicksand:wght@400;500;600;700&display=swap');
 
 :root {
   --font-size: 16px;
-  --background: #f5f5f7;
-  --foreground: #1d1d1f;
+  --background: #F8F5FF;
+  --foreground: #1A0F3C;
   --card: #ffffff;
-  --card-foreground: #1d1d1f;
+  --card-foreground: #1A0F3C;
   --popover: #ffffff;
-  --popover-foreground: #1d1d1f;
-  --primary: #1d1d1f;
+  --popover-foreground: #1A0F3C;
+  --primary: #6334CD;
   --primary-foreground: #ffffff;
-  --secondary: #f5f5f7;
-  --secondary-foreground: #1d1d1f;
-  --muted: #e8e8ed;
-  --muted-foreground: #86868b;
-  --accent: #f5f5f7;
-  --accent-foreground: #1d1d1f;
-  --destructive: #ff3b30;
+  --secondary: #EDE9FF;
+  --secondary-foreground: #1A0F3C;
+  --muted: #EDE9FF;
+  --muted-foreground: #7C6FA0;
+  --accent: #EDE9FF;
+  --accent-foreground: #1A0F3C;
+  --destructive: #FF3B30;
   --destructive-foreground: #ffffff;
-  --border: rgba(0, 0, 0, 0.08);
+  --border: rgba(99, 52, 205, 0.12);
   --input: transparent;
-  --input-background: #f5f5f7;
-  --switch-background: #e5e5ea;
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
-  --ring: rgba(0, 0, 0, 0.15);
+  --input-background: #EDE9FF;
+  --switch-background: #D4CCFF;
+  --font-weight-medium: 700;
+  --font-weight-normal: 600;
+  --ring: rgba(99, 52, 205, 0.2);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   --radius: 1rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: #030213;
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-  
-  /* Pastel accent colors */
-  --color-pink: #ffb3d9;
-  --color-yellow: #f4e44d;
-  --color-green: #8fce7b;
-  --color-blue: #4a90e2;
-  --color-orange: #ff9b5e;
-  --color-purple: #b19cd9;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1A0F3C;
+  --sidebar-primary: #6334CD;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #EDE9FF;
+  --sidebar-accent-foreground: #1A0F3C;
+  --sidebar-border: rgba(99, 52, 205, 0.12);
+  --sidebar-ring: rgba(99, 52, 205, 0.2);
+
+  /* Section signature colors */
+  --color-hero:      #FF6B6B;
+  --color-world:     #00C9B1;
+  --color-beginning: #F7C948;
+  --color-challenge: #C77DFF;
+  --color-ending:    #06D6A0;
+
+  /* Legacy accent colors */
+  --color-pink:   #ffb3d9;
+  --color-yellow: #F7C948;
+  --color-green:  #06D6A0;
+  --color-blue:   #6334CD;
+  --color-orange: #FF9500;
+  --color-purple: #C77DFF;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+  --background: #0d0a1f;
+  --foreground: #ede8ff;
+  --card: #1a1540;
+  --card-foreground: #ede8ff;
+  --popover: #1a1540;
+  --popover-foreground: #ede8ff;
+  --primary: #9B79FF;
+  --primary-foreground: #0d0a1f;
+  --secondary: #2a2250;
+  --secondary-foreground: #ede8ff;
+  --muted: #2a2250;
+  --muted-foreground: #8a7faa;
+  --accent: #2a2250;
+  --accent-foreground: #ede8ff;
+  --destructive: #FF3B30;
+  --destructive-foreground: #ffffff;
+  --border: rgba(155, 121, 255, 0.2);
+  --input: rgba(155, 121, 255, 0.1);
+  --ring: rgba(155, 121, 255, 0.3);
+  --font-weight-medium: 700;
+  --font-weight-normal: 600;
 }
 
 @theme inline {
@@ -140,55 +134,55 @@
 }
 
 /**
- * Base typography. This is not applied to elements which have an ancestor with a Tailwind text class.
+ * Base typography.
  */
 @layer base {
   :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {
     h1 {
       font-size: var(--text-2xl);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
+      font-weight: 900;
+      line-height: 1.15;
     }
 
     h2 {
       font-size: var(--text-xl);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
+      font-weight: 800;
+      line-height: 1.25;
     }
 
     h3 {
       font-size: var(--text-lg);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
+      font-weight: 800;
+      line-height: 1.3;
     }
 
     h4 {
       font-size: var(--text-base);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
+      font-weight: 700;
+      line-height: 1.4;
     }
 
     p {
       font-size: var(--text-base);
-      font-weight: var(--font-weight-normal);
-      line-height: 1.5;
+      font-weight: 600;
+      line-height: 1.55;
     }
 
     label {
       font-size: var(--text-base);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
+      font-weight: 700;
+      line-height: 1.4;
     }
 
     button {
       font-size: var(--text-base);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
+      font-weight: 800;
+      line-height: 1.4;
     }
 
     input {
       font-size: var(--text-base);
-      font-weight: var(--font-weight-normal);
+      font-weight: 600;
       line-height: 1.5;
     }
   }
@@ -196,10 +190,27 @@
 
 html {
   font-size: var(--font-size);
-  font-family: 'Quicksand', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  font-family: 'Nunito', 'Quicksand', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* ── Shared Wonder Worlds animations ── */
+@keyframes ww-aurora {
+  0%, 100% { opacity: 0.6; transform: scale(1) rotate(0deg); }
+  50%       { opacity: 1;   transform: scale(1.08) rotate(4deg); }
+}
+@keyframes ww-float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-12px); }
+}
+@keyframes ww-pulse-ring {
+  0%   { transform: scale(1);   opacity: 0.5; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+
+.ww-aurora { animation: ww-aurora 9s ease-in-out infinite; }
+.ww-float  { animation: ww-float  4s ease-in-out infinite; }

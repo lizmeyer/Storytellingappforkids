@@ -2,28 +2,37 @@ import { useState, useEffect } from 'react';
 import { motion, useMotionValue, useTransform, PanInfo } from 'motion/react';
 import { VoiceInput } from './VoiceInput';
 import { DrawingCanvas } from './DrawingCanvas';
-import { Button } from './ui/button';
-import { Paintbrush, MessageSquare, X, SkipForward, Lightbulb, Sparkles, ChevronRight, RotateCcw, Loader2, Grid3x3, Check } from 'lucide-react';
+import {
+  Paintbrush, MessageSquare, X, SkipForward, Lightbulb,
+  Sparkles, ChevronRight, RotateCcw, Loader2, Grid3x3, Check, Home,
+} from 'lucide-react';
 import { StoryAnswer, StorySection } from '../types/story';
 import { analyzeDrawing, getCardTypeFromId } from '../utils/drawingAnalysis';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
 } from './ui/alert-dialog';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription,
+  DialogHeader, DialogTitle,
 } from './ui/dialog';
 
+// ── Section colour palette ──────────────────────────────────────────────────
+const SECTION_COLORS = [
+  { color: '#FF6B6B', glow: 'rgba(255,107,107,0.18)' },
+  { color: '#00C9B1', glow: 'rgba(0,201,177,0.18)'   },
+  { color: '#F7C948', glow: 'rgba(247,201,72,0.18)'  },
+  { color: '#C77DFF', glow: 'rgba(199,125,255,0.18)' },
+  { color: '#06D6A0', glow: 'rgba(6,214,160,0.18)'   },
+];
+
+const BG   = '#F8F5FF';
+const TEXT  = '#1A0F3C';
+const MUTED = '#7C6FA0';
+const CARD  = '#ffffff';
+
+// ── Props ───────────────────────────────────────────────────────────────────
 interface SectionCardDeckProps {
   section: StorySection;
   answers: Map<string, StoryAnswer>;
@@ -35,62 +44,62 @@ interface SectionCardDeckProps {
   onPreviewStory?: () => void;
 }
 
-export function SectionCardDeck({ 
-  section,
-  answers,
-  onAnswer,
-  onSkip,
-  onSectionComplete,
-  onSaveAndExit,
-  onViewAllSections,
-  onPreviewStory
+// Resolve section index from section ID
+function getSectionIndex(sectionId: string): number {
+  const map: Record<string, number> = {
+    character: 0, setting: 1, beginning: 2, obstacles: 3, ending: 4,
+  };
+  for (const [key, idx] of Object.entries(map)) {
+    if (sectionId.includes(key)) return idx;
+  }
+  return 0;
+}
+
+// ── Component ───────────────────────────────────────────────────────────────
+export function SectionCardDeck({
+  section, answers, onAnswer, onSkip,
+  onSectionComplete, onSaveAndExit,
+  onViewAllSections, onPreviewStory,
 }: SectionCardDeckProps) {
-  // Active deck of card IDs (cards not yet answered)
-  const [activeDeck, setActiveDeck] = useState<string[]>([]);
-  const [isInitialized, setIsInitialized] = useState(false); // Track if deck has been initialized
-  const [answer, setAnswer] = useState('');
-  const [showDrawing, setShowDrawing] = useState(false);
-  const [drawing, setDrawing] = useState<string | undefined>();
-  const [showExitDialog, setShowExitDialog] = useState(false);
-  const [exitDirection, setExitDirection] = useState<'left' | 'right' | null>(null);
-  const [removedCards, setRemovedCards] = useState<string[]>([]); // For undo
-  const [isAnalyzing, setIsAnalyzing] = useState(false); // Track drawing analysis state
-  const [showCardNavigator, setShowCardNavigator] = useState(false); // Card grid view
 
-  // Motion values for drag - MUST be before any conditional returns
-  const x = useMotionValue(0);
-  const rotate = useTransform(x, [-300, 0, 300], [-20, 0, 20]);
-  const opacity = useTransform(x, [-300, -150, 0, 150, 300], [0.3, 1, 1, 1, 0.3]);
-  const skipIndicatorOpacity = useTransform(x, [-150, -50, 0], [1, 0.5, 0]);
-  const saveIndicatorOpacity = useTransform(x, [0, 50, 150], [0, 0.5, 1]);
-  const skipIndicatorScale = useTransform(skipIndicatorOpacity, [0, 1], [0.8, 1]);
-  const saveIndicatorScale = useTransform(saveIndicatorOpacity, [0, 1], [0.8, 1]);
+  const [activeDeck, setActiveDeck]             = useState<string[]>([]);
+  const [isInitialized, setIsInitialized]       = useState(false);
+  const [answer, setAnswer]                     = useState('');
+  const [showDrawing, setShowDrawing]           = useState(false);
+  const [drawing, setDrawing]                   = useState<string | undefined>();
+  const [showExitDialog, setShowExitDialog]     = useState(false);
+  const [exitDirection, setExitDirection]       = useState<'left' | 'right' | null>(null);
+  const [removedCards, setRemovedCards]         = useState<string[]>([]);
+  const [isAnalyzing, setIsAnalyzing]           = useState(false);
+  const [showCardNavigator, setShowCardNavigator] = useState(false);
 
-  // Initialize deck with all unanswered cards - ONLY when section changes
+  // Motion values – must be before any early return
+  const x                 = useMotionValue(0);
+  const rotate            = useTransform(x, [-300, 0, 300], [-20, 0, 20]);
+  const opacity           = useTransform(x, [-300, -150, 0, 150, 300], [0.3, 1, 1, 1, 0.3]);
+  const skipOpacity       = useTransform(x, [-150, -50, 0], [1, 0.5, 0]);
+  const saveOpacity       = useTransform(x, [0, 50, 150], [0, 0.5, 1]);
+  const skipScale         = useTransform(skipOpacity, [0, 1], [0.8, 1]);
+  const saveScale         = useTransform(saveOpacity, [0, 1], [0.8, 1]);
+
+  const secIdx   = getSectionIndex(section.id);
+  const secColor = SECTION_COLORS[secIdx] ?? SECTION_COLORS[0];
+
+  // Init deck
   useEffect(() => {
-    const unansweredCards = section.cards
-      .filter(card => !answers.has(card.id))
-      .map(card => card.id);
-    
-    // If all cards are answered (reviewing a completed section), show all cards
-    // Otherwise, show only unanswered cards
-    const cardsToShow = unansweredCards.length === 0 
-      ? section.cards.map(card => card.id)
-      : unansweredCards;
-    
-    setActiveDeck(cardsToShow);
-    setExitDirection(null); // Reset animation state
-    setRemovedCards([]); // Reset undo history for new section
-    x.set(0); // Reset card position
-    setIsInitialized(true); // Mark deck as initialized
-  }, [section.id]); // Only re-run when section changes, not when answers change
+    const unanswered = section.cards.filter(c => !answers.has(c.id)).map(c => c.id);
+    setActiveDeck(unanswered.length === 0 ? section.cards.map(c => c.id) : unanswered);
+    setExitDirection(null);
+    setRemovedCards([]);
+    x.set(0);
+    setIsInitialized(true);
+  }, [section.id]);
 
-  // Get current card from active deck
-  const currentCardId = activeDeck[0];
-  const currentCard = section.cards.find(c => c.id === currentCardId);
+  const currentCardId  = activeDeck[0];
+  const currentCard    = section.cards.find(c => c.id === currentCardId);
   const existingAnswer = currentCard ? answers.get(currentCard.id) : undefined;
 
-  // Load existing answer when card changes
+  // Sync answer state when card changes
   useEffect(() => {
     if (currentCard) {
       if (existingAnswer) {
@@ -105,58 +114,31 @@ export function SectionCardDeck({
     }
   }, [currentCardId, existingAnswer]);
 
-  // Check if section is complete - ONLY after initialization
+  // Check section complete
   useEffect(() => {
     if (isInitialized && activeDeck.length === 0 && section.cards.length > 0) {
-      // All cards answered!
-      setTimeout(() => {
-        onSectionComplete();
-      }, 300);
+      setTimeout(onSectionComplete, 300);
     }
   }, [activeDeck.length, isInitialized]);
 
-  const handleDragEnd = (event: any, info: PanInfo) => {
-    const threshold = 100;
-    const velocity = Math.abs(info.velocity.x);
-    const distance = Math.abs(info.offset.x);
-    
-    // Consider both distance and velocity for more natural feel
-    const shouldSwipe = distance > threshold || (velocity > 500 && distance > 50);
-    
-    if (shouldSwipe) {
-      if (info.offset.x > 0) {
-        // Swiped right - save and remove from deck
-        handleSaveCard();
-      } else {
-        // Swiped left - skip (move to back of deck)
-        handleSkipCard();
-      }
+  // ── Handlers ───────────────────────────────────────────────────────────────
+  const handleDragEnd = (_: any, info: PanInfo) => {
+    const dist = Math.abs(info.offset.x);
+    const vel  = Math.abs(info.velocity.x);
+    if (dist > 100 || (vel > 500 && dist > 50)) {
+      info.offset.x > 0 ? handleSaveCard() : handleSkipCard();
     } else {
-      // Snap back with spring animation
       x.set(0);
     }
   };
 
   const handleSaveCard = () => {
     if (!currentCard) return;
-    
-    // If there's no content, treat as skip instead
-    if (!answer.trim() && !drawing) {
-      handleSkipCard();
-      return;
-    }
-    
-    // Save the answer
+    if (!answer.trim() && !drawing) { handleSkipCard(); return; }
     onAnswer(currentCard.id, answer, drawing);
-    
     setExitDirection('right');
-    
-    // Remove card from active deck with smooth timing
     setTimeout(() => {
-      setActiveDeck(prev => {
-        const newDeck = prev.slice(1); // Remove first card
-        return newDeck;
-      });
+      setActiveDeck(prev => prev.slice(1));
       setRemovedCards(prev => [...prev, currentCard.id]);
       setExitDirection(null);
       x.set(0);
@@ -165,16 +147,10 @@ export function SectionCardDeck({
 
   const handleSkipCard = () => {
     if (!currentCard) return;
-    
     onSkip(currentCard.id);
     setExitDirection('left');
-    
-    // Move card to back of deck with smooth timing
     setTimeout(() => {
-      setActiveDeck(prev => {
-        const newDeck = [...prev.slice(1), prev[0]]; // Move first to last
-        return newDeck;
-      });
+      setActiveDeck(prev => [...prev.slice(1), prev[0]]);
       setExitDirection(null);
       x.set(0);
     }, 300);
@@ -182,8 +158,8 @@ export function SectionCardDeck({
 
   const handleUndo = () => {
     if (removedCards.length > 0) {
-      const lastRemoved = removedCards[removedCards.length - 1];
-      setActiveDeck(prev => [lastRemoved, ...prev]);
+      const last = removedCards[removedCards.length - 1];
+      setActiveDeck(prev => [last, ...prev]);
       setRemovedCards(prev => prev.slice(0, -1));
       x.set(0);
     }
@@ -191,28 +167,19 @@ export function SectionCardDeck({
 
   const handleDrawingSave = async (dataUrl: string) => {
     setDrawing(dataUrl);
-    
-    // Auto-analyze drawing for character-related cards
     if (currentCard) {
       const cardType = getCardTypeFromId(currentCard.id);
-      
-      // Only auto-analyze for character, setting, and obstacle cards
       if (cardType === 'character' || cardType === 'setting' || cardType === 'obstacle') {
         setIsAnalyzing(true);
         try {
           const analysis = await analyzeDrawing(dataUrl, cardType);
           setAnswer(analysis.description);
-          // Don't close drawing mode yet - wait for analysis
-        } catch (error) {
-          console.error('Failed to analyze drawing:', error);
-          // Continue without analysis if it fails
-        } finally {
+        } catch { /* continue without analysis */ }
+        finally {
           setIsAnalyzing(false);
-          // Close drawing mode after analysis is complete
           setShowDrawing(false);
         }
       } else {
-        // For non-analyzed cards, just close drawing mode immediately
         setShowDrawing(false);
       }
     } else {
@@ -229,163 +196,155 @@ export function SectionCardDeck({
   };
 
   const handleJumpToCard = (cardId: string) => {
-    // Save current card if there's content
     if (currentCard && (answer.trim() || drawing)) {
       onAnswer(currentCard.id, answer, drawing);
     }
-    
-    // If the card is already answered, temporarily add it to the deck to work on it
-    if (isAnswered(cardId)) {
-      setActiveDeck(prev => [cardId, ...prev.filter(id => id !== cardId)]);
-    } else {
-      // Move the selected card to the front of the deck
-      setActiveDeck(prev => [cardId, ...prev.filter(id => id !== cardId)]);
-    }
-    
+    setActiveDeck(prev => [cardId, ...prev.filter(id => id !== cardId)]);
     setShowCardNavigator(false);
     x.set(0);
   };
 
-  const isAnswered = (cardId: string) => answers.has(cardId);
-  const totalCards = section.cards.length;
-  const answeredCount = section.cards.filter(card => isAnswered(card.id)).length;
+  const isAnswered    = (cardId: string) => answers.has(cardId);
+  const totalCards    = section.cards.length;
+  const answeredCount = section.cards.filter(c => isAnswered(c.id)).length;
   const remainingCount = activeDeck.length;
-  const isReviewMode = answeredCount === totalCards && activeDeck.length === totalCards;
+  const isReviewMode  = answeredCount === totalCards && activeDeck.length === totalCards;
 
-  // If no current card (all done), show loading state
+  // Empty state
   if (!currentCard) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-purple-100 via-pink-100 to-yellow-100">
-        <div className="text-center space-y-4">
-          <div className="text-6xl mb-4">🎉</div>
-          <h2 className="text-3xl text-gray-800">Great work!</h2>
-          <p className="text-gray-600">Processing your answers...</p>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: BG, fontFamily: "'Nunito', sans-serif" }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🎉</div>
+          <h2 style={{ fontSize: '2rem', fontWeight: 900, color: TEXT }}>Great work!</h2>
+          <p style={{ color: MUTED }}>Processing your answers…</p>
         </div>
       </div>
     );
   }
 
-  // Get next few cards for stack preview
-  const nextCards = activeDeck.slice(1, 4).map(cardId => 
-    section.cards.find(c => c.id === cardId)
-  ).filter(Boolean);
+  const nextCards = activeDeck.slice(1, 4).map(id => section.cards.find(c => c.id === id)).filter(Boolean);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-purple-100 via-pink-100 to-yellow-100">
-      <div className="w-full max-w-2xl">
-        {/* Header with Section Info */}
-        <div className="mb-6 flex items-center justify-between">
+    <div style={{
+      minHeight: '100vh',
+      background: BG,
+      display: 'flex',
+      flexDirection: 'column',
+      padding: '1.5rem',
+      position: 'relative',
+      overflow: 'hidden',
+      fontFamily: "'Nunito', sans-serif",
+    }}>
+      {/* Section ambient glow */}
+      <div style={{
+        position: 'fixed', top: '35%', left: '50%', transform: 'translate(-50%, -50%)',
+        width: '600px', height: '600px', borderRadius: '50%',
+        background: `radial-gradient(circle, ${secColor.glow} 0%, transparent 65%)`,
+        pointerEvents: 'none', animation: 'ww-aurora 9s ease-in-out infinite', zIndex: 0,
+      }} />
+
+      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: '640px', margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1 }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
           <div>
-            <h2 className="text-2xl text-gray-800">{section.name}</h2>
-            <p className="text-sm text-gray-600">
-              {answeredCount} answered • {remainingCount} remaining
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: TEXT, margin: 0 }}>{section.name}</h2>
+            <p style={{ fontSize: '0.78rem', color: MUTED, margin: 0 }}>
+              {answeredCount} answered · {remainingCount} remaining
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {onViewAllSections && (
+              <button
+                onClick={onViewAllSections}
+                style={{ background: '#fff', border: '1.5px solid rgba(99,52,205,0.15)', borderRadius: '100px', padding: '0.45rem 0.9rem', color: MUTED, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.35rem', fontFamily: 'inherit', boxShadow: '0 2px 10px rgba(99,52,205,0.06)' }}
+              >
+                <Home size={13} /> Chapters
+              </button>
+            )}
+            <button
               onClick={() => setShowCardNavigator(true)}
-              className="gap-2"
+              style={{ background: '#fff', border: '1.5px solid rgba(99,52,205,0.15)', borderRadius: '100px', padding: '0.45rem 0.9rem', color: MUTED, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.35rem', fontFamily: 'inherit', boxShadow: '0 2px 10px rgba(99,52,205,0.06)' }}
             >
-              <Grid3x3 className="w-4 h-4" />
-              View All
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
+              <Grid3x3 size={13} /> View All
+            </button>
+            <button
               onClick={() => setShowExitDialog(true)}
-              className="gap-2"
+              style={{ background: '#fff', border: '1.5px solid rgba(99,52,205,0.15)', borderRadius: '100px', padding: '0.45rem 0.9rem', color: MUTED, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.35rem', fontFamily: 'inherit', boxShadow: '0 2px 10px rgba(99,52,205,0.06)' }}
             >
-              <X className="w-4 h-4" />
-              Save & Exit
-            </Button>
+              <X size={13} /> Exit
+            </button>
           </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="mb-6">
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-500"
-              style={{ width: `${(answeredCount / totalCards) * 100}%` }}
-            />
-          </div>
+        {/* Progress bar */}
+        <div style={{ background: '#EDE9FF', borderRadius: '100px', height: '6px', marginBottom: '1rem', overflow: 'hidden' }}>
+          <motion.div
+            animate={{ width: `${(answeredCount / totalCards) * 100}%` }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+            style={{ height: '100%', background: `linear-gradient(90deg, ${secColor.color}, ${secColor.color}aa)`, borderRadius: '100px' }}
+          />
         </div>
 
-        {/* Review Mode Banner */}
+        {/* Review mode banner */}
         {isReviewMode && (
-          <div className="mb-4 bg-green-50 border-2 border-green-300 rounded-xl p-3">
-            <div className="flex items-center justify-center gap-2 text-sm text-green-700">
-              <Check className="w-4 h-4" />
-              <span>
-                ✨ Review Mode - All cards completed! You can edit any answer.
-              </span>
-            </div>
+          <div style={{ background: 'rgba(6,214,160,0.1)', border: '1.5px solid rgba(6,214,160,0.3)', borderRadius: '12px', padding: '0.6rem 1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+            <Check size={16} color="#06D6A0" />
+            <span style={{ fontSize: '0.85rem', color: '#047857', fontWeight: 800 }}>
+              ✨ Review Mode — All cards done! You can edit any answer.
+            </span>
           </div>
         )}
 
-        {/* Swipe Instructions */}
-        <div className="text-center mb-4 space-y-1">
-          <p className="text-sm text-gray-600">
-            Swipe right to save • Swipe left to skip
+        {/* Swipe instructions */}
+        <div style={{ textAlign: 'center', marginBottom: '0.75rem' }}>
+          <p style={{ fontSize: '0.78rem', color: MUTED, margin: 0 }}>
+            ← Skip &nbsp;•&nbsp; Swipe right to save →
           </p>
-          <div className="flex items-center justify-center gap-4 text-xs text-gray-500">
-            <span>← Skip (goes to back)</span>
-            <span>•</span>
-            <span>Save (completes card) →</span>
-          </div>
         </div>
 
-        {/* Card Stack Container */}
-        <div className="relative h-[600px] flex items-center justify-center">
-          {/* Background Cards (stacked behind) */}
+        {/* Card stack */}
+        <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '520px' }}>
+
+          {/* Ghost cards */}
           {nextCards.map((card, index) => (
-            <motion.div 
+            <motion.div
               key={card!.id}
-              className="absolute inset-0 flex items-center justify-center pointer-events-none"
-              style={{ zIndex: 10 - index - 1 }}
-              initial={false}
-              animate={{
-                scale: 0.95 - index * 0.025,
-                y: (index + 1) * 10,
-                opacity: 0.7 - index * 0.2,
-              }}
-              transition={{
-                type: "spring",
-                stiffness: 300,
-                damping: 30,
-                mass: 0.8
-              }}
+              style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', zIndex: 10 - index - 1 }}
+              animate={{ scale: 0.95 - index * 0.025, y: (index + 1) * 12, opacity: 0.65 - index * 0.2 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             >
-              <div 
-                className="bg-white rounded-3xl shadow-xl w-full max-w-xl h-[550px] border-4 border-white"
-              >
-                {/* Subtle preview of next card's question */}
-                <div className="p-8 text-center">
-                  <div className="inline-block bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-1 rounded-full text-sm mb-4">
-                    ✨ Creative Companion
+              <div style={{
+                background: CARD,
+                borderRadius: '28px',
+                width: '100%', maxWidth: '520px', height: '520px',
+                boxShadow: '0 8px 40px rgba(99,52,205,0.1)',
+                borderTop: `5px solid ${secColor.color}40`,
+              }}>
+                <div style={{ padding: '2rem', textAlign: 'center' }}>
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                    background: `${secColor.color}15`,
+                    border: `1.5px solid ${secColor.color}30`,
+                    borderRadius: '100px', padding: '0.3rem 0.85rem',
+                    fontSize: '0.75rem', fontWeight: 900, color: secColor.color,
+                    marginBottom: '1rem',
+                  }}>
+                    <Sparkles size={12} /> Creative Companion
                   </div>
-                  <h3 className="text-xl text-gray-600">
-                    {card!.question}
-                  </h3>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: TEXT }}>{card!.question}</h3>
                 </div>
               </div>
             </motion.div>
           ))}
 
-          {/* Active Card */}
+          {/* Active card */}
           <motion.div
             key={currentCard.id}
-            className="absolute inset-0 flex items-center justify-center cursor-grab active:cursor-grabbing"
-            style={{ 
-              x, 
-              rotate, 
-              opacity,
-              zIndex: 20
-            }}
+            style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: showDrawing ? 'default' : 'grab', zIndex: 20, x, rotate, opacity }}
             initial={{ scale: 0.9, opacity: 0 }}
-            drag={showDrawing ? false : "x"} // Disable swiping when drawing
+            drag={showDrawing ? false : 'x'}
             dragConstraints={{ left: 0, right: 0 }}
             onDragEnd={handleDragEnd}
             dragElastic={0.2}
@@ -393,84 +352,85 @@ export function SectionCardDeck({
             whileTap={{ scale: 0.98 }}
             animate={exitDirection ? {
               x: exitDirection === 'right' ? 1000 : -1000,
-              opacity: 0,
-              rotate: exitDirection === 'right' ? 25 : -25,
-              scale: 0.9,
-              transition: { 
-                type: "spring",
-                stiffness: 300,
-                damping: 30
-              }
+              opacity: 0, rotate: exitDirection === 'right' ? 25 : -25, scale: 0.9,
+              transition: { type: 'spring', stiffness: 300, damping: 30 },
             } : {
-              x: 0,
-              opacity: 1,
-              rotate: 0,
-              scale: 1,
-              transition: {
-                type: "spring",
-                stiffness: 400,
-                damping: 30
-              }
+              x: 0, opacity: 1, rotate: 0, scale: 1,
+              transition: { type: 'spring', stiffness: 400, damping: 30 },
             }}
           >
-            <div className="bg-white rounded-3xl shadow-2xl p-8 space-y-6 border-4 border-white w-full max-w-xl select-none">
-              {/* Question */}
-              <div className="text-center space-y-2">
-                <div className="inline-block bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-1 rounded-full text-sm">
-                  ✨ Creative Companion
-                </div>
-                <h3 className="text-2xl text-gray-800">
-                  {currentCard.question}
-                </h3>
-                
-                {/* Help Text */}
-                {currentCard.helpText && (
-                  <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-3 mt-4">
-                    <div className="flex items-start gap-2">
-                      <Lightbulb className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                      <p className="text-sm text-gray-700 text-left">
-                        {currentCard.helpText}
-                      </p>
-                    </div>
-                  </div>
-                )}
+            <div style={{
+              background: CARD,
+              borderRadius: '28px',
+              padding: '2rem',
+              width: '100%', maxWidth: '520px',
+              boxShadow: `0 12px 50px rgba(99,52,205,0.12), 0 0 60px ${secColor.glow}`,
+              borderTop: `5px solid ${secColor.color}`,
+              userSelect: 'none',
+              overflowY: 'auto',
+              maxHeight: '520px',
+            }}>
+
+              {/* Companion badge */}
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                background: `${secColor.color}15`,
+                border: `1.5px solid ${secColor.color}35`,
+                borderRadius: '100px', padding: '0.3rem 0.85rem',
+                fontSize: '0.75rem', fontWeight: 900, color: secColor.color,
+                marginBottom: '1.1rem', letterSpacing: '0.04em',
+              }}>
+                <Sparkles size={12} /> Creative Companion
               </div>
 
-              {/* Input Area */}
+              {/* Question */}
+              <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: TEXT, marginBottom: '1rem', lineHeight: 1.3 }}>
+                {currentCard.question}
+              </h3>
+
+              {/* Help text */}
+              {currentCard.helpText && (
+                <div style={{ background: 'rgba(247,201,72,0.1)', border: '1.5px solid rgba(247,201,72,0.35)', borderRadius: '12px', padding: '0.75rem', marginBottom: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                  <Lightbulb size={16} color="#B08A00" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <p style={{ fontSize: '0.83rem', color: '#7A6010', lineHeight: 1.45, margin: 0 }}>
+                    {currentCard.helpText}
+                  </p>
+                </div>
+              )}
+
+              {/* Input / drawing / analyzing */}
               {!showDrawing && !isAnalyzing ? (
                 <VoiceInput
                   value={answer}
                   onChange={setAnswer}
                   placeholder={currentCard.placeholder}
                   onComplete={handleSaveCard}
+                  accentColor={secColor.color}
                 />
               ) : isAnalyzing ? (
-                <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-8 min-h-[200px] flex items-center justify-center">
-                  <div className="text-center space-y-3">
-                    <Loader2 className="w-12 h-12 animate-spin text-purple-600 mx-auto" />
-                    <p className="text-purple-700">✨ Analyzing your drawing...</p>
-                    <p className="text-sm text-gray-600">Creating a description for you!</p>
+                <div style={{ background: `${secColor.color}10`, border: `1.5px solid ${secColor.color}30`, borderRadius: '16px', padding: '2.5rem', minHeight: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Loader2 size={44} color={secColor.color} style={{ marginBottom: '0.75rem', animation: 'spin 1s linear infinite' }} />
+                    <p style={{ color: secColor.color, fontWeight: 800, margin: 0 }}>✨ Analyzing your drawing…</p>
+                    <p style={{ color: MUTED, fontSize: '0.85rem', margin: '0.25rem 0 0' }}>Creating a description for you!</p>
                   </div>
                 </div>
               ) : (
-                <DrawingCanvas
-                  onSave={handleDrawingSave}
-                  initialDrawing={drawing}
-                />
+                <DrawingCanvas onSave={handleDrawingSave} initialDrawing={drawing} />
               )}
 
-              {/* Examples - moved below input */}
+              {/* Examples */}
               {currentCard.examples && currentCard.examples.length > 0 && (
-                <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-3">
-                  <div className="flex items-start gap-2">
-                    <Sparkles className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
-                    <div className="text-left flex-1">
-                      <p className="text-sm text-gray-700 mb-2">For example:</p>
-                      <ul className="space-y-1 text-sm text-gray-600">
-                        {currentCard.examples.map((example, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <span className="text-purple-400">•</span>
-                            <span className="italic">"{example}"</span>
+                <div style={{ background: `${secColor.color}10`, border: `1.5px solid ${secColor.color}25`, borderRadius: '12px', padding: '0.85rem', marginTop: '1rem' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                    <Sparkles size={15} color={secColor.color} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                      <p style={{ fontSize: '0.8rem', color: MUTED, margin: '0 0 0.4rem', fontWeight: 800 }}>For example:</p>
+                      <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                        {currentCard.examples.map((ex, idx) => (
+                          <li key={idx} style={{ display: 'flex', gap: '0.5rem', fontSize: '0.82rem', color: TEXT, marginBottom: '0.25rem' }}>
+                            <span style={{ color: secColor.color }}>•</span>
+                            <em>"{ex}"</em>
                           </li>
                         ))}
                       </ul>
@@ -479,55 +439,43 @@ export function SectionCardDeck({
                 </div>
               )}
 
-              {/* Drawing Option Toggle */}
+              {/* Draw / describe toggle */}
               {currentCard.allowDrawing && !showDrawing && (
-                <Button
-                  variant="outline"
+                <button
                   onClick={() => setShowDrawing(true)}
-                  className="w-full gap-2"
+                  style={{ width: '100%', marginTop: '0.85rem', background: '#F8F5FF', border: '1.5px solid rgba(99,52,205,0.15)', borderRadius: '12px', padding: '0.65rem', fontSize: '0.85rem', fontWeight: 800, color: MUTED, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem', fontFamily: 'inherit' }}
                 >
-                  <Paintbrush className="w-4 h-4" />
-                  Draw Instead
-                </Button>
+                  <Paintbrush size={15} /> Draw Instead
+                </button>
               )}
 
               {currentCard.allowDrawing && showDrawing && (
-                <Button
-                  variant="outline"
+                <button
                   onClick={() => setShowDrawing(false)}
-                  className="w-full gap-2"
+                  style={{ width: '100%', marginTop: '0.85rem', background: '#F8F5FF', border: '1.5px solid rgba(99,52,205,0.15)', borderRadius: '12px', padding: '0.65rem', fontSize: '0.85rem', fontWeight: 800, color: MUTED, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem', fontFamily: 'inherit' }}
                 >
-                  <MessageSquare className="w-4 h-4" />
-                  Describe Instead
-                </Button>
+                  <MessageSquare size={15} /> Describe Instead
+                </button>
               )}
 
-              {/* Drawing Preview */}
+              {/* Drawing preview */}
               {drawing && !showDrawing && (
-                <div className="space-y-2">
+                <div style={{ marginTop: '0.85rem' }}>
                   {isAnalyzing ? (
-                    <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
-                      <div className="flex items-center justify-center gap-2 text-purple-600">
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        <span className="text-sm">✨ Analyzing your drawing...</span>
-                      </div>
+                    <div style={{ background: `${secColor.color}10`, border: `1.5px solid ${secColor.color}30`, borderRadius: '12px', padding: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                      <Loader2 size={16} color={secColor.color} style={{ animation: 'spin 1s linear infinite' }} />
+                      <span style={{ fontSize: '0.83rem', color: secColor.color, fontWeight: 800 }}>Analyzing your drawing…</span>
                     </div>
                   ) : (
                     <>
-                      <p className="text-sm text-center text-gray-600">Your drawing:</p>
-                      <img 
-                        src={drawing} 
-                        alt="Your drawing" 
-                        className="w-full rounded-lg border-2 border-purple-200"
-                      />
-                      <Button
-                        variant="outline"
+                      <p style={{ fontSize: '0.82rem', textAlign: 'center', color: MUTED, marginBottom: '0.5rem' }}>Your drawing:</p>
+                      <img src={drawing} alt="Your drawing" style={{ width: '100%', borderRadius: '12px', border: `1.5px solid ${secColor.color}30` }} />
+                      <button
                         onClick={() => setShowDrawing(true)}
-                        className="w-full"
-                        size="sm"
+                        style={{ width: '100%', marginTop: '0.5rem', background: '#F8F5FF', border: '1.5px solid rgba(99,52,205,0.15)', borderRadius: '12px', padding: '0.55rem', fontSize: '0.82rem', fontWeight: 800, color: MUTED, cursor: 'pointer', fontFamily: 'inherit' }}
                       >
                         Edit Drawing
-                      </Button>
+                      </button>
                     </>
                   )}
                 </div>
@@ -535,87 +483,68 @@ export function SectionCardDeck({
             </div>
           </motion.div>
 
-          {/* Swipe Direction Indicators */}
-          <motion.div 
-            className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
-            style={{ 
-              opacity: skipIndicatorOpacity,
-              scale: skipIndicatorScale,
-              zIndex: 30
-            }}
-          >
-            <div className="bg-yellow-400 text-white px-6 py-3 rounded-full shadow-lg">
-              <span className="text-xl">← SKIP</span>
+          {/* Swipe direction indicators */}
+          <motion.div style={{ position: 'absolute', left: '0.5rem', top: '50%', translateY: '-50%', pointerEvents: 'none', opacity: skipOpacity, scale: skipScale, zIndex: 30 }}>
+            <div style={{ background: '#FF6B6B', color: '#fff', padding: '0.5rem 1rem', borderRadius: '100px', fontWeight: 900, fontSize: '0.9rem', boxShadow: '0 4px 16px rgba(255,107,107,0.35)' }}>
+              ← SKIP
             </div>
           </motion.div>
 
-          <motion.div 
-            className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none"
-            style={{ 
-              opacity: saveIndicatorOpacity,
-              scale: saveIndicatorScale,
-              zIndex: 30
-            }}
-          >
-            <div className="bg-green-400 text-white px-6 py-3 rounded-full shadow-lg">
-              <span className="text-xl">SAVE →</span>
+          <motion.div style={{ position: 'absolute', right: '0.5rem', top: '50%', translateY: '-50%', pointerEvents: 'none', opacity: saveOpacity, scale: saveScale, zIndex: 30 }}>
+            <div style={{ background: secColor.color, color: '#fff', padding: '0.5rem 1rem', borderRadius: '100px', fontWeight: 900, fontSize: '0.9rem', boxShadow: `0 4px 16px ${secColor.glow}` }}>
+              SAVE →
             </div>
           </motion.div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="mt-6 flex items-center justify-between gap-4">
-          <Button
-            variant="outline"
+        {/* Action buttons */}
+        <div style={{ marginTop: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+          <motion.button
             onClick={handleUndo}
             disabled={removedCards.length === 0}
-            className="gap-2"
-            size="lg"
+            whileHover={{ scale: removedCards.length > 0 ? 1.05 : 1 }}
+            whileTap={{ scale: removedCards.length > 0 ? 0.95 : 1 }}
+            style={{ flex: 1, background: '#fff', border: '1.5px solid rgba(99,52,205,0.15)', borderRadius: '100px', padding: '0.85rem', fontSize: '0.88rem', fontWeight: 800, color: removedCards.length > 0 ? TEXT : MUTED, cursor: removedCards.length > 0 ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', opacity: removedCards.length > 0 ? 1 : 0.45, boxShadow: '0 2px 10px rgba(99,52,205,0.06)', fontFamily: 'inherit' }}
           >
-            <RotateCcw className="w-5 h-5" />
-            Undo
-          </Button>
+            <RotateCcw size={15} /> Undo
+          </motion.button>
 
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handleSkipCard}
-              className="gap-2 border-2 border-yellow-400 text-yellow-700 hover:bg-yellow-50"
-              size="lg"
+          <motion.button
+            onClick={handleSkipCard}
+            whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+            style={{ flex: 1, background: '#fff', border: '1.5px solid #FF6B6B40', borderRadius: '100px', padding: '0.85rem', fontSize: '0.88rem', fontWeight: 800, color: '#FF6B6B', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', boxShadow: '0 2px 10px rgba(255,107,107,0.1)', fontFamily: 'inherit' }}
+          >
+            <SkipForward size={15} /> Skip
+          </motion.button>
+
+          {(answer.trim() || drawing) && (
+            <motion.button
+              onClick={handleSaveCard}
+              whileHover={{ scale: 1.04, boxShadow: `0 10px 30px ${secColor.glow}` }}
+              whileTap={{ scale: 0.96 }}
+              style={{ flex: 2, background: `linear-gradient(135deg, ${secColor.color} 0%, ${secColor.color}bb 100%)`, border: 'none', borderRadius: '100px', padding: '0.9rem', fontSize: '0.95rem', fontWeight: 900, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', boxShadow: `0 6px 22px ${secColor.glow}`, fontFamily: 'inherit' }}
             >
-              <SkipForward className="w-4 h-4" />
-              Skip
-            </Button>
-            
-            {(answer.trim() || drawing) && (
-              <Button
-                onClick={handleSaveCard}
-                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 gap-2"
-                size="lg"
-              >
-                Save
-                <ChevronRight className="w-5 h-5" />
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Deck Info */}
-        <div className="text-center mt-4 text-sm text-gray-500">
-          {remainingCount > 1 && (
-            <p>{remainingCount - 1} more card{remainingCount - 1 !== 1 ? 's' : ''} in deck</p>
+              Save <ChevronRight size={17} />
+            </motion.button>
           )}
         </div>
 
-        {/* Decorative Elements */}
-        <div className="text-center mt-2 space-x-2">
-          <span className="inline-block animate-bounce" style={{ animationDelay: '0ms' }}>☁️</span>
-          <span className="inline-block animate-bounce" style={{ animationDelay: '150ms' }}>⭐</span>
-          <span className="inline-block animate-bounce" style={{ animationDelay: '300ms' }}>🌈</span>
+        {/* Deck info */}
+        {remainingCount > 1 && (
+          <p style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.8rem', color: MUTED }}>
+            {remainingCount - 1} more card{remainingCount - 1 !== 1 ? 's' : ''} in deck
+          </p>
+        )}
+
+        {/* Floating decorative */}
+        <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
+          {['☁️', '⭐', '🌈'].map((e, i) => (
+            <span key={i} style={{ display: 'inline-block', animation: 'ww-float 2s ease-in-out infinite', animationDelay: `${i * 0.15}s`, fontSize: '1.2rem', opacity: 0.55, marginLeft: i > 0 ? '0.5rem' : 0 }}>{e}</span>
+          ))}
         </div>
       </div>
 
-      {/* Save & Exit Dialog */}
+      {/* Save & Exit dialog */}
       <AlertDialog open={showExitDialog} onOpenChange={setShowExitDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -626,97 +555,73 @@ export function SectionCardDeck({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep Creating</AlertDialogCancel>
-            <AlertDialogAction onClick={handleSaveAndExit}>
-              Save & Exit
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleSaveAndExit}>Save & Exit</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Card Navigator Dialog */}
+      {/* Card navigator dialog */}
       <Dialog open={showCardNavigator} onOpenChange={setShowCardNavigator}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-2xl">Jump to Any Card</DialogTitle>
+            <DialogTitle>Jump to Any Card</DialogTitle>
             <DialogDescription>
-              Select any card to jump to it. Green cards are completed, purple is your current card.
+              Select any card to jump to it. Green = completed, highlighted = current.
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
             {section.cards.map((card, index) => {
-              const answered = isAnswered(card.id);
+              const answered  = isAnswered(card.id);
               const isCurrent = card.id === currentCardId;
-              
               return (
                 <button
                   key={card.id}
                   onClick={() => handleJumpToCard(card.id)}
-                  className={`relative p-4 rounded-xl border-2 transition-all text-left group hover:scale-105 ${
-                    isCurrent
-                      ? 'border-purple-500 bg-purple-50 shadow-lg'
-                      : answered
-                      ? 'border-green-300 bg-green-50 hover:border-green-400'
-                      : 'border-gray-200 bg-white hover:border-purple-300'
-                  }`}
+                  style={{
+                    position: 'relative', padding: '1rem', borderRadius: '14px',
+                    border: `2px solid ${isCurrent ? secColor.color : answered ? '#06D6A040' : 'rgba(99,52,205,0.1)'}`,
+                    background: isCurrent ? `${secColor.color}12` : answered ? 'rgba(6,214,160,0.06)' : '#fff',
+                    textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+                    transition: 'all 0.2s',
+                  }}
                 >
-                  {/* Card Number Badge */}
-                  <div className={`absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                    answered
-                      ? 'bg-green-500 text-white'
-                      : 'bg-gray-200 text-gray-600'
-                  }`}>
-                    {answered ? <Check className="w-4 h-4" /> : index + 1}
+                  <div style={{ position: 'absolute', top: '8px', right: '8px', width: '22px', height: '22px', borderRadius: '50%', background: answered ? '#06D6A0' : '#EDE9FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 900, color: answered ? '#fff' : MUTED }}>
+                    {answered ? <Check size={13} color="#fff" /> : index + 1}
                   </div>
-                  
-                  {/* Current Indicator */}
                   {isCurrent && (
-                    <div className="absolute top-2 left-2 bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full">
+                    <div style={{ position: 'absolute', top: '8px', left: '8px', background: secColor.color, color: '#fff', fontSize: '0.6rem', fontWeight: 900, padding: '2px 6px', borderRadius: '100px' }}>
                       Current
                     </div>
                   )}
-                  
-                  {/* Card Question */}
-                  <div className={`text-sm mt-6 ${
-                    answered ? 'text-gray-700' : 'text-gray-600'
-                  }`}>
+                  <p style={{ fontSize: '0.82rem', color: TEXT, marginTop: isCurrent ? '1.5rem' : '0.25rem', marginBottom: '0.35rem', lineHeight: 1.3 }}>
                     {card.question}
-                  </div>
-                  
-                  {/* Answer Preview */}
+                  </p>
                   {answered && (
-                    <div className="mt-2 text-xs text-gray-500 line-clamp-2 italic">
+                    <p style={{ fontSize: '0.75rem', color: MUTED, fontStyle: 'italic', margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                       "{answers.get(card.id)?.answer || 'Drawing added'}"
-                    </div>
+                    </p>
                   )}
-                  
-                  {/* Status Label */}
-                  <div className={`mt-3 text-xs ${
-                    answered ? 'text-green-600' : 'text-gray-500'
-                  }`}>
+                  <p style={{ fontSize: '0.72rem', color: answered ? '#06D6A0' : MUTED, marginTop: '0.5rem', fontWeight: 800 }}>
                     {answered ? '✓ Completed' : 'Not answered'}
-                  </div>
+                  </p>
                 </button>
               );
             })}
           </div>
-          
-          {/* Summary */}
-          <div className="mt-6 p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-700">Progress:</span>
-              <span className="text-purple-700">
-                {answeredCount} of {totalCards} cards completed
-              </span>
+
+          <div style={{ marginTop: '1.25rem', background: `${secColor.color}10`, border: `1.5px solid ${secColor.color}30`, borderRadius: '14px', padding: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+              <span style={{ color: MUTED, fontWeight: 800 }}>Progress:</span>
+              <span style={{ color: secColor.color, fontWeight: 900 }}>{answeredCount} of {totalCards} cards</span>
             </div>
-            <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${(answeredCount / totalCards) * 100}%` }}
-              />
+            <div style={{ background: '#EDE9FF', borderRadius: '100px', height: '6px', overflow: 'hidden' }}>
+              <div style={{ width: `${(answeredCount / totalCards) * 100}%`, height: '100%', background: `linear-gradient(90deg, ${secColor.color}, ${secColor.color}aa)`, borderRadius: '100px', transition: 'width 0.5s ease' }} />
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
